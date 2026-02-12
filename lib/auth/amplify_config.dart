@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:flutter/foundation.dart';
 
@@ -10,6 +11,8 @@ import '../config/app_config.dart';
 Future<void> configureAmplifyAuth(AppConfig config) async {
   final signInRedirectUri = _signInRedirectUri(config);
   final signOutRedirectUri = _signOutRedirectUri(config);
+  // WebDomain must be a full URL (https://host) so the SDK builds the correct authorize URL.
+  final webDomain = _normalizeWebDomain(config.cognitoHostedUiDomain);
 
   final configMap = {
     'UserAgent': 'aws-amplify-cli/2.0',
@@ -29,7 +32,7 @@ Future<void> configureAmplifyAuth(AppConfig config) async {
             'Default': {
               'authenticationFlowType': 'USER_SRP_AUTH',
               'OAuth': {
-                'WebDomain': config.cognitoHostedUiDomain,
+                'WebDomain': webDomain,
                 'AppClientId': config.userPoolClientId,
                 'SignInRedirectURI': signInRedirectUri,
                 'SignOutRedirectURI': signOutRedirectUri,
@@ -49,6 +52,14 @@ Future<void> configureAmplifyAuth(AppConfig config) async {
   final configString = jsonEncode(configMap);
   await Amplify.addPlugin(AmplifyAuthCognito());
   await Amplify.configure(configString);
+}
+
+/// Ensures WebDomain is a full URL. Amplify/Cognito expect e.g. https://host.
+String _normalizeWebDomain(String cognitoHostedUiDomain) {
+  final s = cognitoHostedUiDomain.trim();
+  if (s.isEmpty) return s;
+  if (s.startsWith('https://') || s.startsWith('http://')) return s;
+  return 'https://$s';
 }
 
 /// Web: use current origin + /callback. Mobile: use portalUrl + /callback or custom scheme from config.
